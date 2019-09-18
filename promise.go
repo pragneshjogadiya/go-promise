@@ -3,31 +3,34 @@ package main
 import (
 	"fmt"
 	"sync"
-	//"sync"
-	//"time"
+	"time"
 )
 
+//Global Wait Group
 var wgGlobal sync.WaitGroup
 
+//Constants pending, fulfilled and rejected which represents state of promise
 const (
 	pending = iota
 	fulfilled
 	rejected
 )
 
+//Struct Promise that will have value, error and state(State can be pending, fulfilled or rejected)
 type promise struct {
-	//wg    sync.WaitGroup
 	value string
 	err   error
 	state int
 }
 
-type ggPromise interface {
+//Promise Interface with then, catch and finally methods
+type promiseInterface interface {
 	then(func(string), func(error))
 	catch(func(error))
-	finally(func(string))
+	finally(func(int))
 }
 
+//Function to create new promise pointer
 func newPromise(f func() (string, error)) *promise {
 	p := &promise{}
 	wgGlobal.Add(1)
@@ -39,8 +42,8 @@ func newPromise(f func() (string, error)) *promise {
 	return p
 }
 
+//then method on struct promise pointer. Takes functions onFulfilled and onRejected as arguments.
 func (p *promise) then(onFulfilled func(string), onRejected func(error)) {
-	//go func() {
 	func() {
 		wgGlobal.Wait()
 		if p.err != nil {
@@ -53,8 +56,8 @@ func (p *promise) then(onFulfilled func(string), onRejected func(error)) {
 	}()
 }
 
+//catch method on struct promise pointer. Takes function onRejected as argument.
 func (p *promise) catch(onRejected func(error)) {
-	//go func() {
 	func() {
 		wgGlobal.Wait()
 		if p.err != nil {
@@ -62,52 +65,60 @@ func (p *promise) catch(onRejected func(error)) {
 			p.state = rejected
 			return
 		}
-		//r(p.res)
 	}()
 }
 
-func (p *promise) finally(onFinally func(string)) {
-	//go func() {
-	//func() {
-	wgGlobal.Wait()
-	//if p.err != nil {
-	//	e(p.err)
-	//	return
-	//}
-	onFinally(p.value)
-	p.state = fulfilled
-	//}()
+//finally method on struct promise pointer. Takes function onFinally as argument.
+func (p *promise) finally(onFinally func(int)) {
+	func() {
+		wgGlobal.Wait()
+		onFinally(p.state)
+	}()
 }
 
-func exampleTicker() (string, error) {
-	//<-time.Tick(time.Second * 1)
-	return "hi", nil
+//You can implement your own function to return (string,error) pair.
+func exampleFunction() (string, error) {
+	<-time.Tick(time.Second * 1)
+
+	//Return response with nil error
+	return "Hello There", nil
+
+	//Return response with error. Uncomment below line and comment above line to return error. Don't forget to import errors package.
+	//return "", errors.New("Error in example function")
 }
 
 func main() {
-	//doneChan := make(chan int)
-	var p = newPromise(exampleTicker)
-	// fmt.Println("Hello")
-	// p.Then(func(result string) { fmt.Println(result);  doneChan <- 1}, func(err error) { fmt.Println(err) })
-	// <-doneChan
+	//Creating Promise
+	var promiseCreated = newPromise(exampleFunction)
 
-	// var p = promise{
-	// 	value: "Hello",
-	// 	err:   nil,
-	// 	state: pending,
-	// }
+	//Creating Promise Interface
+	var p promiseInterface = promiseCreated
 
-	var gg ggPromise = p
+	p.then(
+		func(result string) {
+			fmt.Println("Inside then method")
+			fmt.Println(result)
+		},
+		func(err error) {
+			fmt.Println("Inside then method")
+			fmt.Println("Error Occured")
+			fmt.Println(err)
+		})
 
-	//wgGlobal.Add(1)
-	gg.then(func(result string) { fmt.Println(result) }, func(err error) { fmt.Println(err) })
+	p.catch(func(err error) {
+		fmt.Println("Inside catch method")
+		fmt.Println("Error Occured")
+		fmt.Println(err)
+	})
 
-	//wgGlobal.Add(1)
-	gg.catch(func(err error) { fmt.Println(err) })
-
-	//wgGlobal.Add(1)
-	gg.finally(func(result string) { fmt.Println(result) })
-
-	//wgGlobal.Wait()
+	p.finally(func(result int) {
+		if result == 1 {
+			fmt.Println("Promise Fulfilled")
+		} else if result == 2 {
+			fmt.Println("Promise Rejected")
+		} else {
+			fmt.Println("Error Occured")
+		}
+	})
 
 }
